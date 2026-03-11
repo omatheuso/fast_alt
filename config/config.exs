@@ -7,24 +7,24 @@
 # General application configuration
 import Config
 
-config :pdf_to_md,
+config :fast_alt,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
-config :pdf_to_md, PdfToMdWeb.Endpoint,
+config :fast_alt, FastAltWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: PdfToMdWeb.ErrorHTML, json: PdfToMdWeb.ErrorJSON],
+    formats: [html: FastAltWeb.ErrorHTML, json: FastAltWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: PdfToMd.PubSub,
+  pubsub_server: FastAlt.PubSub,
   live_view: [signing_salt: "NF41TQ75"]
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  pdf_to_md: [
+  fast_alt: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -34,7 +34,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  pdf_to_md: [
+  fast_alt: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
@@ -49,6 +49,9 @@ config :logger, :default_formatter,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+# Use EXLA as the default Nx backend for accelerated inference
+config :nx, default_backend: EXLA.Backend
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

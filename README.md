@@ -1,4 +1,4 @@
-# PdfToMd
+# FastAlt
 
 To start your Phoenix server:
 

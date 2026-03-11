@@ -2,7 +2,7 @@ import Config
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
-config :pdf_to_md, PdfToMdWeb.Endpoint,
+config :fast_alt, FastAltWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "87wNyNDUdnFq64GhSpQacCtAhxfkNyKPDrkwRewkNM6ZCCx/c0GAlEssGxoiT4hY",
   server: false

@@ -6,7 +6,7 @@ import Config
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :pdf_to_md, PdfToMdWeb.Endpoint,
+config :fast_alt, FastAltWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
@@ -15,8 +15,8 @@ config :pdf_to_md, PdfToMdWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "XVQxIVuO+JCBlMwTR9Dsy19eUIxeUZa1AzPbxaz2Ndq9vapamoW/ZtXAkYog9uuS",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:pdf_to_md, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:pdf_to_md, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:fast_alt, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:fast_alt, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -43,7 +43,7 @@ config :pdf_to_md, PdfToMdWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :pdf_to_md, PdfToMdWeb.Endpoint,
+config :fast_alt, FastAltWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -52,13 +52,13 @@ config :pdf_to_md, PdfToMdWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/pdf_to_md_web/router\.ex$"E,
-      ~r"lib/pdf_to_md_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/fast_alt_web/router\.ex$"E,
+      ~r"lib/fast_alt_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :pdf_to_md, dev_routes: true
+config :fast_alt, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

@@ -1,9 +1,9 @@
-defmodule PdfToMd.MixProject do
+defmodule FastAlt.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :pdf_to_md,
+      app: :fast_alt,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule PdfToMd.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {PdfToMd.Application, []},
+      mod: {FastAlt.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -60,7 +60,11 @@ defmodule PdfToMd.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:bumblebee, "~> 0.5"},
+      {:nx, "~> 0.7"},
+      {:exla, "~> 0.7"},
+      {:stb_image, "~> 0.6"}
     ]
   end
 
@@ -74,10 +78,10 @@ defmodule PdfToMd.MixProject do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind pdf_to_md", "esbuild pdf_to_md"],
+      "assets.build": ["compile", "tailwind fast_alt", "esbuild fast_alt"],
       "assets.deploy": [
-        "tailwind pdf_to_md --minify",
-        "esbuild pdf_to_md --minify",
+        "tailwind fast_alt --minify",
+        "esbuild fast_alt --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
