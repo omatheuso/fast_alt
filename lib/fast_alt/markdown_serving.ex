@@ -47,20 +47,23 @@ defmodule FastAlt.MarkdownServing do
     serving
   end
 
-  @supported_exts ~w(.jpg .jpeg .png .bmp .gif)
-
   @doc """
-  Runs inference on `image_path` and returns the generated text string.
+  Runs inference on `image_path` and returns the generated caption string.
+
+  Uses `Image` (libvips) for decoding, which supports JPEG, PNG, WebP, AVIF,
+  HEIC, TIFF, GIF, BMP, and more. The decoded image is re-encoded as PNG in
+  memory and handed to `StbImage` for Bumblebee compatibility.
   """
   def run(image_path) do
-    ext = image_path |> Path.extname() |> String.downcase()
-
-    unless ext in @supported_exts do
-      raise "format #{ext} is not supported. Supported formats: #{Enum.join(@supported_exts, ", ")}"
-    end
-
     Logger.debug("[MarkdownServing] reading image: #{image_path}")
-    image = StbImage.read_file!(image_path)
+
+    image =
+      with {:ok, vix_image} <- Image.open(image_path),
+           {:ok, png_binary} <- Image.write(vix_image, :memory, suffix: ".png") do
+        StbImage.read_binary!(png_binary)
+      else
+        {:error, reason} -> raise "failed to decode image: #{inspect(reason)}"
+      end
 
     Logger.debug(
       "[MarkdownServing] image loaded — shape: #{inspect(image.shape)}, type: #{inspect(image.type)}"

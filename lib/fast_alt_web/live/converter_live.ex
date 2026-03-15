@@ -3,7 +3,7 @@ defmodule FastAltWeb.ConverterLive do
 
   require Logger
 
-  @accepted_types ~w(.jpg .jpeg .png .bmp .gif)
+  @accepted_types ~w(.jpg .jpeg .png .bmp .gif .webp .tiff)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -108,7 +108,7 @@ defmodule FastAltWeb.ConverterLive do
                   <.icon name="hero-photo" class="size-12 text-base-content/30" />
                   <p class="text-base-content/60 mt-2">Drop an image or click to browse</p>
                   <p class="text-xs text-base-content/40">
-                    JPG, PNG, BMP, GIF and more · Max 20 MB
+                    JPG, PNG, WebP, GIF, BMP, TIFF · Max 20 MB
                   </p>
                   <.live_file_input upload={@uploads.image} class="file-input file-input-bordered mt-4" />
 

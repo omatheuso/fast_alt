@@ -64,7 +64,8 @@ defmodule FastAlt.MixProject do
       {:bumblebee, "~> 0.5"},
       {:nx, "~> 0.7"},
       {:exla, "~> 0.7"},
-      {:stb_image, "~> 0.6"}
+      {:stb_image, "~> 0.6"},
+      {:image, "~> 0.63"}
     ]
   end
 
