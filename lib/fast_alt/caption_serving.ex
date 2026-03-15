@@ -49,11 +49,20 @@ defmodule FastAlt.CaptionServing do
   @doc """
   Runs inference on `image_path` and returns the generated caption string.
 
+  Uses the serving registered under this module's name in the supervision tree.
+  """
+  def run(image_path), do: run(image_path, __MODULE__)
+
+  @doc """
+  Runs inference on `image_path` using the given `serving_name` atom.
+
+  Useful in CI/CD where the serving is started transiently under a different name.
+
   Uses `Image` (libvips) for decoding, which supports JPEG, PNG, WebP, AVIF,
   HEIC, TIFF, GIF, BMP, and more. The decoded image is re-encoded as PNG in
   memory and handed to `StbImage` for Bumblebee compatibility.
   """
-  def run(image_path) do
+  def run(image_path, serving_name) do
     Logger.debug("[CaptionServing] reading image: #{image_path}")
 
     image =
@@ -70,7 +79,7 @@ defmodule FastAlt.CaptionServing do
 
     Logger.debug("[CaptionServing] sending to batched_run …")
 
-    result = Nx.Serving.batched_run(__MODULE__, %{image: image, text: @prompt})
+    result = Nx.Serving.batched_run(serving_name, %{image: image, text: @prompt})
 
     Logger.debug("[CaptionServing] raw result: #{inspect(result)}")
 

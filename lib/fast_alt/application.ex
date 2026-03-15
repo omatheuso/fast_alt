@@ -7,15 +7,23 @@ defmodule FastAlt.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      FastAltWeb.Telemetry,
-      {DNSCluster, query: Application.get_env(:fast_alt, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: FastAlt.PubSub},
-      {Task.Supervisor, name: FastAlt.TaskSupervisor},
-      {Nx.Serving,
-       serving: FastAlt.CaptionServing.serving(), name: FastAlt.CaptionServing, batch_size: 1},
-      FastAltWeb.Endpoint
-    ]
+    serving_children =
+      if Application.get_env(:fast_alt, :start_serving, true) do
+        [
+          {Nx.Serving,
+           serving: FastAlt.CaptionServing.serving(), name: FastAlt.CaptionServing, batch_size: 1}
+        ]
+      else
+        []
+      end
+
+    children =
+      [
+        FastAltWeb.Telemetry,
+        {DNSCluster, query: Application.get_env(:fast_alt, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: FastAlt.PubSub},
+        {Task.Supervisor, name: FastAlt.TaskSupervisor}
+      ] ++ serving_children ++ [FastAltWeb.Endpoint]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
