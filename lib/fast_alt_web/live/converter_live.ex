@@ -31,7 +31,10 @@ defmodule FastAltWeb.ConverterLive do
     entries =
       consume_uploaded_entries(socket, :image, fn %{path: path}, entry ->
         ext = Path.extname(entry.client_name)
-        dest = Path.join(System.tmp_dir!(), "img_upload_#{:erlang.unique_integer([:positive])}#{ext}")
+
+        dest =
+          Path.join(System.tmp_dir!(), "img_upload_#{:erlang.unique_integer([:positive])}#{ext}")
+
         File.cp!(path, dest)
         {:ok, dest}
       end)
@@ -68,7 +71,7 @@ defmodule FastAltWeb.ConverterLive do
     Logger.info("[ConverterLive] process_image started — #{image_path}")
 
     try do
-      caption = FastAlt.MarkdownServing.run(image_path)
+      caption = FastAlt.CaptionServing.run(image_path)
       Logger.info("[ConverterLive] inference done — #{String.length(caption)} chars")
       send(liveview_pid, {:inference_complete, caption})
     rescue
@@ -110,7 +113,10 @@ defmodule FastAltWeb.ConverterLive do
                   <p class="text-xs text-base-content/40">
                     JPG, PNG, WebP, GIF, BMP, TIFF · Max 20 MB
                   </p>
-                  <.live_file_input upload={@uploads.image} class="file-input file-input-bordered mt-4" />
+                  <.live_file_input
+                    upload={@uploads.image}
+                    class="file-input file-input-bordered mt-4"
+                  />
 
                   <%= for entry <- @uploads.image.entries do %>
                     <div class="w-full mt-2 space-y-1">

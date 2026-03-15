@@ -1,114 +1,211 @@
-# PDF to Markdown Converter — Project Summary
+# FastAlt — Project Summary
 
 ## Purpose
 
-A Phoenix LiveView web application that converts PDF documents to Markdown using local AI vision inference. Users upload a PDF, the app renders each page to an image, runs vision-language inference on each image, and streams the Markdown output back to the UI in real time.
+FastAlt is an Elixir library and Mix task for automatically generating `alt` text for images in compiled frontend output. It scans HTML files for `<img>` tags missing or empty `alt` attributes, runs local AI vision inference on each image, and either reports the findings or patches the HTML files in-place.
+
+The primary use case is CI/CD pipelines: fail a build when images lack accessibility descriptions, and optionally auto-fix them before deployment.
+
+A Phoenix LiveView playground is included for interactive, browser-based testing.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Web Framework | Phoenix 1.8.3 + LiveView 1.1.0 |
+| Web Framework | Phoenix 1.8 + LiveView 1.1 (playground only) |
 | HTTP Adapter | Bandit 1.5 |
 | ML Inference | Bumblebee 0.5 + Nx 0.7 + EXLA 0.7 (XLA backend) |
 | Vision Model | `Salesforce/blip-image-captioning-base` (HuggingFace) |
-| Image Loading | StbImage 0.6 |
-| PDF Rendering | `pdftoppm` CLI (Poppler system dependency) |
-| CSS | Tailwind CSS v4 + daisyUI (light/dark themes) |
+| Image Decoding | `Image` 0.63 (libvips) → `StbImage` 0.6 (Bumblebee compat) |
+| HTML Parsing | LazyHTML (Lexbor NIF, same as Phoenix LiveView) |
+| CSS | Tailwind CSS v4 + daisyUI |
 | JS Bundler | esbuild |
 | JSON | Jason |
 
-**No database** — stateless compute app. Files are written to `System.tmp_dir()` and cleaned up after processing.
+**No database** — stateless. Images are read from disk; any temp files are cleaned up after processing.
+
+## System Dependencies
+
+| Dependency | Purpose | Install |
+|---|---|---|
+| libvips | Image decoding (WebP, AVIF, HEIC, TIFF, …) | `brew install vips` / `apt install libvips-dev` |
+| HuggingFace Hub | BLIP model weights (downloaded once at first boot) | (automatic) |
 
 ## Architecture Overview
 
+### Library / CI path
+
 ```
-User uploads PDF
-       │
-       ▼
-ConverterLive (LiveView)
+mix fast_alt.scan ./dist
+        │
+        ▼
+FastAlt.FileScanner
+  walks dist/ → list of .html files
+        │
+        ▼
+FastAlt.HTMLScanner          (per HTML file)
+  LazyHTML → img tags missing alt
+        │
+        ▼
+FastAlt.ImageResolver
+  src → absolute disk path
+  skips: external URLs, data URIs, missing files
+        │
+        ▼
+FastAlt.CaptionServing.run/2  (per image)
+  Image.open → PNG binary → StbImage → Nx.Serving
+  → BLIP inference → caption string
+        │
+        ▼
+FastAlt.AltPatcher            (if --patch)
+  LazyHTML round-trip → inject alt attrs → write file
+        │
+        ▼
+FastAlt.Scanner
+  collects results → JSON or text report → exit 0/1
+```
+
+### Web playground path
+
+```
+User uploads image (JPG, PNG, WebP, GIF, BMP, TIFF)
+        │
+        ▼
+FastAltWeb.ConverterLive
+  consumes upload → writes to tmp
   spawns Task via TaskSupervisor
-       │
-       ▼
-PdfRenderer.render_pages/2
-  calls pdftoppm → JPEG images in /tmp
-       │
-       ▼
-MarkdownServing.run/1  (per page)
-  Nx.Serving → Bumblebee BLIP model → text
-       │
-       ▼
-  Messages sent back to LiveView
-  (:page_complete, :processing_done, :processing_failed)
-       │
-       ▼
-UI updates in real time (streaming markdown output)
+        │
+        ▼
+FastAlt.CaptionServing.run/1
+  Image.open → PNG binary → StbImage
+  Nx.Serving → BLIP → caption string
+        │
+        ▼
+  {:inference_complete, caption} sent to LiveView
+  UI displays result
 ```
 
 ## Key Modules
 
-### Domain Logic
+### Library core
 
-**`PdfToMd.PdfRenderer`**
-- Calls `pdftoppm` to render PDF pages as JPEGs into a temp dir
-- Hard limit: `@max_pages = 1` (only first page processed)
-- Returns `{page_paths, cleanup_fn}` — cleanup always called even on error
+**`FastAlt.Scanner`** — top-level orchestrator
+- Wires `FileScanner`, `HTMLScanner`, `ImageResolver`, `CaptionServing`, `AltPatcher`
+- Accepts `patch:`, `format:`, and `serving:` options
+- Uses `Task.async_stream` over HTML files for concurrent I/O with controlled back-pressure
 
-**`PdfToMd.MarkdownServing`**
-- Loads `Salesforce/blip-image-captioning-base` from HuggingFace at app startup
-- Registers an `Nx.Serving` (batch size 1) under the app supervisor
-- Exposes `run(image_path)` → returns Markdown string for that page image
+**`FastAlt.FileScanner`**
+- Recursively walks a directory and returns all `.html` / `.htm` file paths
+- No dependencies beyond the standard library
 
-### Web Layer
+**`FastAlt.HTMLScanner`**
+- Parses an HTML binary with LazyHTML
+- Extracts all `<img>` entries; `alt: nil` = attribute absent, `alt: ""` = present but blank
 
-**`PdfToMdWeb.ConverterLive`** — the only LiveView
-- Manages upload (max 50 MB, PDF only, 1 file at a time)
-- State machine: `:idle` → `:processing` → `:done`
-- Spawns async Task for processing; receives progress messages
-- Accumulates markdown output page-by-page with real-time display
-- Provides copy-to-clipboard and reset functionality
+**`FastAlt.ImageResolver`**
+- Resolves a `src` value relative to its containing HTML file
+- Returns `{:ok, absolute_path}` or `{:skip, reason}`
+- Skips: `data:` URIs, `http://` / `https://` / `//` URLs, files that don't exist on disk
 
-**`PdfToMdWeb.Router`**
+**`FastAlt.CaptionServing`**
+- Loads `Salesforce/blip-image-captioning-base` from HuggingFace at startup
+- Decodes images via `Image` (libvips) → in-memory PNG → `StbImage` for Bumblebee
+- Supports all formats libvips can open: JPEG, PNG, WebP, AVIF, HEIC, TIFF, GIF, BMP, and more
+- `run/1` uses the supervision-tree serving; `run/2` accepts a custom serving name for CI use
+
+**`FastAlt.AltPatcher`**
+- Reads an HTML file, uses LazyHTML tree manipulation to inject `alt` attributes
+- Writes the patched file back to disk
+- Known trade-off: LazyHTML normalizes HTML on round-trip (whitespace, self-closing tags)
+
+### Mix task
+
+**`Mix.Tasks.FastAlt.Scan`**
+- Entrypoint: `mix fast_alt.scan [OPTIONS] <directory>`
+- Starts a transient `Nx.Serving` supervisor (no Phoenix app required)
+- Reports findings to stdout; exits `1` if any images were missing alt
+
 ```
-GET /          → ConverterLive  (single route)
+Options:
+  --patch   / -p   Rewrite HTML files in-place with generated alt text
+  --format  / -f   text (default) or json
+  --out            Write report to a file instead of stdout
+```
+
+### Web layer
+
+**`FastAltWeb.ConverterLive`** — the only LiveView (playground)
+- Accepts: JPG, JPEG, PNG, BMP, GIF, WebP, TIFF (max 20 MB)
+- State machine: `:idle` → `:processing` → `:done`
+- Spawns async Task; displays caption on completion
+
+**`FastAltWeb.Router`**
+```
+GET /               → ConverterLive
 GET /dev/dashboard  → Phoenix LiveDashboard (dev only)
 ```
 
-**`PdfToMd.Application`**
-Supervision tree:
+## Supervision Tree
+
 ```
-Application
+FastAlt.Application
 ├── Telemetry
 ├── DNS Cluster
 ├── PubSub
-├── TaskSupervisor  (for async PDF processing)
-├── Nx.Serving      (Bumblebee BLIP model)
-└── Endpoint
+├── TaskSupervisor         (async image processing in the web playground)
+├── Nx.Serving             (BLIP model — skipped when start_serving: false)
+└── Endpoint               (web playground)
 ```
 
-## LiveView State
+The `Nx.Serving` child is controlled by a config flag:
+```elixir
+config :fast_alt, start_serving: false  # set this in CI to skip model load at boot
+```
+
+When `false`, the Mix task starts its own short-lived serving and tears it down after the scan.
+
+## LiveView State (playground)
 
 | Assign | Type | Description |
 |---|---|---|
 | `state` | atom | `:idle` / `:processing` / `:done` |
-| `markdown_output` | string | Accumulated Markdown so far |
-| `error` | string / nil | Error message to display |
-| `total_pages` | integer | Total pages to process |
-| `current_page` | integer | Pages processed so far |
-| `uploads` | LiveView upload | PDF file upload config |
+| `caption` | string | Generated alt text |
+| `error` | string / nil | Error message |
+| `uploads` | LiveView upload | Image upload config |
 
-## Processing Flow (detail)
+## Mix Task Output
 
-1. User submits form → `"upload"` event fires
-2. LiveView consumes upload, writes PDF to tmp dir
-3. `Task.Supervisor.start_child/2` spawns `process_pdf/2`
-4. Task sends `{:processing_started, total_pages}` to LiveView pid
-5. For each page:
-   - `PdfRenderer` renders page → JPEG
-   - `MarkdownServing.run/1` calls Bumblebee inference → text
-   - Task sends `{:page_complete, page_num, markdown_chunk}` to LiveView
-6. After all pages: Task sends `{:processing_done}` or `{:processing_failed, reason}`
-7. Temp dirs cleaned up in `after` block regardless of outcome
+**Text format:**
+```
+FastAlt scan: dist/
+  3 HTML files · 7 img tags · 4 missing alt
+
+  [PATCHED]  dist/index.html  →  hero.jpg    →  "a dashboard interface screenshot"
+  [PATCHED]  dist/about.html  →  team.png    →  "three people standing in an office"
+  [SKIP]     dist/index.html  →  https://…   →  external URL
+  [OK]       dist/index.html  →  icon.svg    →  already has alt
+```
+
+**JSON format:**
+```json
+{
+  "scan_root": "dist/",
+  "summary": { "html_files": 3, "img_tags": 7, "missing_alt": 4, "patched": 2, "skipped": 1 },
+  "results": [
+    {
+      "html_file": "dist/index.html",
+      "img_src": "hero.jpg",
+      "img_path": "/abs/dist/hero.jpg",
+      "generated_alt": "a dashboard interface screenshot",
+      "patched": true,
+      "skipped": false,
+      "skip_reason": null
+    }
+  ]
+}
+```
+
+**Exit codes:** `0` = all images already had alt text · `1` = missing alt found (CI lint gate)
 
 ## Configuration
 
@@ -120,33 +217,28 @@ Application
 - `PHX_SERVER` — set to enable server mode
 
 **Assets:**
-- Tailwind v4 — no `tailwind.config.js`, uses `@import "tailwindcss"` in `app.css`
+- Tailwind v4 — uses `@import "tailwindcss"` in `app.css`, no `tailwind.config.js`
 - daisyUI themes: `light` and `dark`
-- Custom Elixir/Phoenix-inspired color palette
-
-## External Dependencies
-
-| Dependency | Purpose | Notes |
-|---|---|---|
-| HuggingFace Hub | Model weights download | Only at startup / first run |
-| `pdftoppm` (Poppler) | PDF → image conversion | System dep, must be installed |
-
-Install system deps:
-```bash
-brew install poppler   # macOS
-apt install poppler-utils  # Ubuntu/Debian
-```
 
 ## Setup
 
 ```bash
-mix setup         # installs deps, downloads model weights
-mix phx.server    # starts server at localhost:4000
+# System deps (required for image decoding)
+brew install vips          # macOS
+apt install libvips-dev    # Ubuntu/Debian
+
+mix setup                  # install Elixir deps + download BLIP model weights
+mix phx.server             # start the web playground at localhost:4000
+
+# CI/CD usage
+mix fast_alt.scan ./dist                    # report only
+mix fast_alt.scan --patch ./dist            # report + patch HTML files
+mix fast_alt.scan --format json ./dist      # JSON output
 ```
 
-## Known Limitations
+## Known Limitations / Trade-offs
 
-- Only processes the **first page** of a PDF (`@max_pages = 1`)
-- BLIP is an image captioning model, not an OCR/transcription model — output quality for text-heavy PDFs may be poor (recent commit: "LLM doing a stupid job")
-- No persistence — results are lost on page refresh
-- No authentication or rate limiting
+- **BLIP output quality:** BLIP is an image captioning model, not a semantic alt-text generator. Captions are descriptive but may not be ideal accessibility descriptions. Human review is recommended before committing patched output.
+- **HTML normalization on patch:** LazyHTML normalizes HTML on round-trip (whitespace, self-closing tags). Avoid `--patch` on hand-crafted templates you want to keep formatted exactly.
+- **Model load time:** The BLIP model takes seconds to load on first run. In CI, this cost is paid once per job. Pre-warming is not supported in v1.
+- **No authentication or rate limiting** in the web playground.

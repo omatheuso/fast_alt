@@ -13,7 +13,7 @@ defmodule FastAlt.Application do
       {Phoenix.PubSub, name: FastAlt.PubSub},
       {Task.Supervisor, name: FastAlt.TaskSupervisor},
       {Nx.Serving,
-       serving: FastAlt.MarkdownServing.serving(), name: FastAlt.MarkdownServing, batch_size: 1},
+       serving: FastAlt.CaptionServing.serving(), name: FastAlt.CaptionServing, batch_size: 1},
       FastAltWeb.Endpoint
     ]
 
