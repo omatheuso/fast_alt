@@ -47,10 +47,32 @@ defmodule Mix.Tasks.FastAlt.Scan do
 
     Mix.Task.run("app.config")
 
+    # Mix.Task.run("app.config") only evaluates config files — it does NOT start OTP
+    # applications. We need :bumblebee, :exla, :nx, :inets, and all transitive deps
+    # running before CaptionServing.serving/0 contacts HuggingFace or builds the
+    # Nx.Serving. Starting :fast_alt itself pulls in the full dependency tree.
+    # We suppress the application's own Nx.Serving child so this task's supervisor
+    # is the only one holding the serving process.
+    Application.put_env(:fast_alt, :start_serving, false)
+    Application.ensure_all_started(:fast_alt)
+
     {:ok, sup} = start_serving_supervisor()
 
     scan_opts = [patch: patch?, serving: @serving_name]
-    {:ok, results} = FastAlt.Scanner.scan(dir, scan_opts)
+
+    results =
+      case FastAlt.Scanner.scan(dir, scan_opts) do
+        {:ok, results} ->
+          results
+
+        {:error, :enoent} ->
+          Supervisor.stop(sup)
+          Mix.raise("directory not found: #{dir}")
+
+        {:error, reason} ->
+          Supervisor.stop(sup)
+          Mix.raise("scan failed: #{inspect(reason)}")
+      end
 
     Supervisor.stop(sup)
 
@@ -65,8 +87,6 @@ defmodule Mix.Tasks.FastAlt.Scan do
     end
   end
 
-  # --- supervisor ---
-
   defp start_serving_supervisor do
     Supervisor.start_link(
       [
@@ -76,8 +96,6 @@ defmodule Mix.Tasks.FastAlt.Scan do
       strategy: :one_for_one
     )
   end
-
-  # --- arg parsing ---
 
   defp parse_dir!([dir | _]), do: dir
 
@@ -95,8 +113,6 @@ defmodule Mix.Tasks.FastAlt.Scan do
     end
   end
 
-  # --- report building ---
-
   defp build_report(dir, results, patch?) do
     total_missing = length(results)
     patched = Enum.count(results, & &1.patched)
@@ -112,8 +128,6 @@ defmodule Mix.Tasks.FastAlt.Scan do
       results: results
     }
   end
-
-  # --- text formatting ---
 
   defp format_report(report, :text), do: format_text(report)
   defp format_report(report, :json), do: format_json(report)
@@ -159,8 +173,6 @@ defmodule Mix.Tasks.FastAlt.Scan do
 
     Jason.encode!(payload, pretty: true)
   end
-
-  # --- output ---
 
   defp write_output(output, nil), do: Mix.shell().info(output)
 

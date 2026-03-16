@@ -106,6 +106,48 @@ mix fast_alt.scan --format json --out report.json ./dist
 
 ---
 
+## Works with any Mix project, not just Phoenix
+
+The Mix task and all library modules work in any Elixir/Mix project. Phoenix is only used for the optional web playground UI included in this repo.
+
+To use FastAlt from a plain Mix project or a non-Phoenix Elixir app, add it as a dependency exactly as you would for a Phoenix project:
+
+```elixir
+# mix.exs
+{:fast_alt, github: "YOUR_USERNAME/fast_alt"}
+```
+
+Then run `mix fast_alt.scan ./your/html/output` as normal.
+
+---
+
+## Known issues when adding as a dependency
+
+### `lazy_html` `:only` conflict
+
+FastAlt uses `lazy_html` at runtime (for HTML parsing and patching). If your host project already lists `lazy_html` restricted to test-only, Mix will raise a dependency conflict:
+
+```
+Dependencies have diverged:
+* lazy_html (Hex package)
+  the :only option for dependency lazy_html does not match
+  the :only option calculated for deps/fast_alt/mix.exs
+```
+
+**Fix:** in your project's `mix.exs`, remove the `only: :test` restriction from `lazy_html`:
+
+```elixir
+# Before (causes conflict)
+{:lazy_html, ">= 0.1.0", only: :test}
+
+# After (correct)
+{:lazy_html, ">= 0.1.0"}
+```
+
+Phoenix apps generated with `phx.new` include `lazy_html` as a test-only dep by default. You will hit this conflict and need to apply the fix above.
+
+---
+
 ## CI/CD integration
 
 ### GitHub Actions
