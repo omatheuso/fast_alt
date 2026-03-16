@@ -25,7 +25,7 @@ defmodule FastAlt.AltPatcherTest do
     assert read_html(path) == "<img src='hero.jpg'>"
   end
 
-  test "injects alt attribute on a matching img" , %{root: root} do
+  test "injects alt attribute on a matching img", %{root: root} do
     path = write_html(root, "index.html", ~s|<img src="hero.jpg">|)
     assert :ok = AltPatcher.patch_file(path, [{"hero.jpg", "a hero image"}])
 

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FastAlt Demo - About</title>
+</head>
+<body>
+  <section>
+    <!-- CASE 6: missing alt in a nested structure, in a second file -->
+    <figure>
+      <img src="assets/logo.svg">
+      <figcaption>Our logo</figcaption>
+    </figure>
+
+    <!-- CASE 7: missing file on disk — scanner will skip with "file not found" -->
+    <img src="assets/does-not-exist.png">
+  </section>
+</body>
+</html>

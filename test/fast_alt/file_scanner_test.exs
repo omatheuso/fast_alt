@@ -4,7 +4,9 @@ defmodule FastAlt.FileScannerTest do
   alias FastAlt.FileScanner
 
   setup do
-    root = Path.join(System.tmp_dir!(), "file_scanner_test_#{:erlang.unique_integer([:positive])}")
+    root =
+      Path.join(System.tmp_dir!(), "file_scanner_test_#{:erlang.unique_integer([:positive])}")
+
     File.mkdir_p!(root)
     on_exit(fn -> File.rm_rf!(root) end)
     %{root: root}

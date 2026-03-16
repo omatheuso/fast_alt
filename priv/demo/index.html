@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FastAlt Demo - Home</title>
+</head>
+<body>
+  <header>
+    <!-- CASE 1: alt attribute is entirely absent — scanner will generate one -->
+    <img src="assets/logo.svg">
+
+    <!-- CASE 2: alt is present and non-empty — scanner leaves this alone -->
+    <img src="assets/logo.svg" alt="FastAlt logo">
+  </header>
+
+  <main>
+    <!-- CASE 3: alt is present but empty — scanner treats this as missing -->
+    <img src="assets/logo.svg" alt="">
+
+    <!-- CASE 4: external URL — scanner skips this (can't read from disk) -->
+    <img src="https://example.com/remote-image.jpg">
+
+    <!-- CASE 5: data URI — scanner skips this (inline base64, no file path) -->
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" alt="">
+  </main>
+</body>
+</html>
